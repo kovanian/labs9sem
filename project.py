@@ -9,7 +9,7 @@ from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 class ImageProcessorApp:
     def __init__(self, root):
         self.root = root
-        self.root.title("Цифровая обработка изображений")
+        self.root.title("ЦОСИИ - Лаба 1")
         self.root.geometry("1400x950")
 
         # Переменные состояния
@@ -94,7 +94,6 @@ class ImageProcessorApp:
         tk.Frame(control_frame, height=20, bg="#f0f0f0").pack()
         tk.Button(control_frame, text="Сбросить все", command=self.reset_image, bg="#ffcccb").pack(fill=tk.X)
 
-
         # Центральная часть (Отображение изображений)
         image_frame = tk.Frame(root)
         image_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
@@ -135,6 +134,46 @@ class ImageProcessorApp:
         counts = np.bincount(flat, minlength=256)
         return counts
 
+    # --- АЛГОРИТМЫ ---
+
+    def threshold_algorithm(self, img_arr, threshold):
+        gray = self.to_grayscale_manual(img_arr)
+        result = np.zeros_like(gray)
+        result[gray >= threshold] = 255
+        result[gray < threshold] = 0
+        return result
+
+    def intensity_slice_algorithm(self, img_arr, min_v, max_v):
+        gray = self.to_grayscale_manual(img_arr)
+        result = np.zeros_like(gray)
+        mask = (gray >= min_v) & (gray <= max_v)
+        result[mask] = 255
+        return result
+
+    def prewitt_operator(self, img_arr):
+        gray = self.to_grayscale_manual(img_arr).astype(np.float32)
+        h, w = gray.shape
+        out_img = np.zeros((h, w), dtype=np.float32)
+
+        top_left = gray[:-2, :-2]
+        top_mid = gray[:-2, 1:-1]
+        top_right = gray[:-2, 2:]
+        mid_left = gray[1:-1, :-2]
+        mid_right = gray[1:-1, 2:]
+        bot_left = gray[2:, :-2]
+        bot_mid = gray[2:, 1:-1]
+        bot_right = gray[2:, 2:]
+
+        gx = (top_right + mid_right + bot_right) - (top_left + mid_left + bot_left)
+        gy = (bot_left + bot_mid + bot_right) - (top_left + top_mid + top_right)
+
+        magnitude = np.sqrt(gx ** 2 + gy ** 2)
+        if np.max(magnitude) != 0:
+            magnitude = (magnitude / np.max(magnitude)) * 255.0
+
+        out_img[1:-1, 1:-1] = magnitude
+        return out_img.astype(np.uint8)
+
     def gamma_correction_algorithm(self, img_arr, c, gamma):
         """
         Гамма-коррекция: s = c * r^gamma
@@ -151,6 +190,7 @@ class ImageProcessorApp:
 
         return result.astype(np.uint8)
 
+    # --- GUI ЛОГИКА ---
 
     def load_image(self):
         file_path = filedialog.askopenfilename(filetypes=[("Image Files", "*.jpg *.png *.jpeg *.bmp")])
@@ -213,23 +253,7 @@ class ImageProcessorApp:
             self.display_image(self.processed_image_arr, self.lbl_processed)
             self.draw_histograms()
 
-    def _get_int_from_entry(self, entry_widget, field_name):
-        try:
-            val = int(entry_widget.get())
-            if val < 0 or val > 255: raise ValueError
-            return val
-        except ValueError:
-            messagebox.showerror("Ошибка", f"'{field_name}' должно быть целым числом (0-255).")
-            return None
-
-    def _get_float_from_entry(self, entry_widget, field_name):
-        try:
-            val = float(entry_widget.get())
-            if val < 0: raise ValueError
-            return val
-        except ValueError:
-            messagebox.showerror("Ошибка", f"'{field_name}' должно быть положительным числом.")
-            return None
+    # --- ВАЛИДАЦИЯ ВВОДА ---
 
     def _get_int_from_entry(self, entry_widget, field_name):
         try:
@@ -286,7 +310,6 @@ class ImageProcessorApp:
         self.processed_image_arr = self.gamma_correction_algorithm(self.original_image_arr, c, gamma)
         self.display_image(self.processed_image_arr, self.lbl_processed)
         self.draw_histograms()
-
 
 
 if __name__ == "__main__":
